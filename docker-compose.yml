@@ -1,0 +1,246 @@
+services:
+  ### dihor.loc PORTFOLIO DEV START ###
+  portfolio-frontend-nextjs-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    build:
+      context: ./portfolio-frontend-nextjs
+      dockerfile: Dev.dockerfile
+    volumes:
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - WEBSITE_URL=https://dihor.loc
+      - BACKEND_HOSTNAME=http://portfolio-backend-fastapi-dev:8000
+      - NEXT_PUBLIC_BACKEND_HOSTNAME=https://dihor.loc
+      - RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+      - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+    command: ['npm', 'run', 'dev']
+    develop:
+      watch:
+        - action: sync
+          path: ./portfolio-frontend-nextjs
+          target: /app
+        - action: rebuild
+          path: ./portfolio-frontend-nextjs/package-lock.json
+    networks:
+      - webnet-dev
+  portfolio-backend-fastapi-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    build:
+      context: ./portfolio-backend-fastapi
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URI=postgresql+psycopg2://portfolio:portfolio@db-dev/portfolio
+      - APP_SECRET=dihordev
+      - GOOGLE_PROJECT_ID=portfolio-1715895301875
+      - RECAPTCHA_SECRET_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+      - RECAPTCHA_API_KEY=AIzaSyCnV1EgfVn-X7XqHTi4Bd1-BYCVdTwLGz8
+    command: ["poetry", "run", "uvicorn", "portfolio_backend_fastapi.main:app", "--host=0.0.0.0", "--reload"]
+    networks:
+      - webnet-dev
+    volumes:
+      - /root/.cache/pypoetry/virtualenvs
+    develop:
+      watch:
+        - action: sync
+          path: ./portfolio-backend-fastapi
+          target: /app
+        - action: rebuild
+          path: ./portfolio-backend-fastapi/pyproject.toml
+  db-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    image: postgres:14.2-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - db_data_dev:/var/lib/postgresql/data/
+    ports:
+      - "5432:5432"
+    networks:
+      - webnet-dev
+  ### dihor.loc PORTFOLIO DEV START ###
+        
+  ### task-management.dihor.loc: TASK MANAGEMENT DEV START ###
+  task-management-frontend-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    build:
+      context: ./task-management-frontend
+      dockerfile: Dev.dockerfile
+    volumes:
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - WEBSITE_URL=https://task-management.dihor.loc
+      - BACKEND_HOSTNAME=http://task-management-backend:5000
+      - NEXT_PUBLIC_BACKEND_HOSTNAME=https://task-management.dihor.loc
+      - RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+      - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+    command: ['npm', 'run', 'dev']
+    develop:
+      watch:
+        - action: sync
+          path: ./task-management-frontend
+          target: /app
+        - action: rebuild
+          path: ./task-management-frontend/package-lock.json
+    networks:
+      - webnet-dev
+  task-management-backend-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    build:
+      context: ./task-management-backend/task-management-backend
+      dockerfile: Dev.dockerfile
+    ports:
+      - "8000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DB_HOST=task-management-db-dev
+      - DB_NAME=task_management
+      - DB_USER=task_management
+      - DB_PASSWORD=task_management
+      - JWT_KEY_BASE64=yB62YkL4GU51uAaSFjMtJzS4WncrtsomEdr7wFfvWqE=
+      - JWT_ISSUER=task-management-backend-dev
+      - JWT_AUDIENCE=task-management-frontend-dev
+    depends_on:
+      - task-management-db-dev
+    networks:
+      - webnet-dev
+    develop:
+      watch:
+        - action: sync
+          path: ./task-management-backend/task-management-backend
+          target: /app
+        - action: rebuild
+          path: ./task-management-backend/task-management-backend/Program.cs
+  task-management-db-dev:
+    profiles: [dev]
+    restart: unless-stopped
+    image: postgres:14.2-alpine
+    environment:
+      POSTGRES_USER: task_management
+      POSTGRES_PASSWORD: task_management
+      POSTGRES_DB: task_management
+    volumes:
+      - task_management_db_data_dev:/var/lib/postgresql/data/
+    networks:
+      - webnet-dev
+  ## TASK MANAGEMENT DEV END ##
+
+  nginx-dev:
+    profiles: [dev]
+    build:
+      context: nginx
+      dockerfile: Dev.dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - webnet-dev
+    depends_on:
+      - portfolio-backend-fastapi-dev
+      - portfolio-frontend-nextjs-dev
+      - task-management-backend-dev
+      - task-management-frontend-dev
+    develop:
+      watch:
+        - action: rebuild
+          path: ./nginx
+
+  portfolio-frontend-nextjs:
+    profiles: [prod]
+    restart: unless-stopped
+    build:
+      context: ./portfolio-frontend-nextjs
+      dockerfile: Dockerfile
+    depends_on:
+      - portfolio-backend-fastapi
+    environment:
+      - NODE_ENV=production
+      - WEBSITE_URL=https://dihor.dev
+      - BACKEND_HOSTNAME=http://portfolio-backend-fastapi:8000
+      - NEXT_PUBLIC_BACKEND_HOSTNAME=https://dihor.dev
+      - RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+      - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+    networks:
+      - webnet
+    volumes:
+      - /root/.cache/pypoetry/virtualenvs
+  portfolio-backend-fastapi:
+    profiles: [prod]
+    restart: unless-stopped
+    build:
+      context: ./portfolio-backend-fastapi
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URI=postgresql+psycopg2://portfolio:Sniffer96__20@db/portfolio
+      - APP_SECRET=dihordev_prod
+      - GOOGLE_PROJECT_ID=portfolio-1715895301875
+      - RECAPTCHA_SECRET_KEY=6LdDUt8pAAAAAOKvC_Hz_AfJw0aKXnuLzCU31l6i
+      - RECAPTCHA_API_KEY=AIzaSyCnV1EgfVn-X7XqHTi4Bd1-BYCVdTwLGz8
+    networks:
+      - webnet
+  nginx:
+    profiles: [prod]
+    restart: unless-stopped
+    build:
+      context: nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    depends_on:
+      - portfolio-frontend-nextjs
+      - portfolio-backend-fastapi
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - webnet
+  lets-encrypt-fastapi-nextjs:
+    profiles: [prod]
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nginx-fastapi-nextjs-lets-encrypt
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /usr/share/nginx/html
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/dev/conf/portfolio.conf:/etc/nginx/vhost.d/portfolio.conf
+      - ./nginx/dev/conf/task-management.conf:/etc/nginx/vhost.d/task-management.conf
+    networks:
+      - webnet-dev
+  db:
+    profiles: [prod]
+    restart: unless-stopped
+    image: postgres:14.2-alpine
+    networks:
+      - webnet
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Sniffer96__20"
+      POSTGRES_DB: postgres
+
+networks:
+  webnet:
+    driver: bridge
+  webnet-dev:
+    driver: bridge
+
+volumes:
+  db_data: {}
+  db_data_dev: {}
+  task_management_db_data_dev: {}
+  task_management_db_data: {}
